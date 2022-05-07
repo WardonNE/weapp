@@ -1,4 +1,4 @@
-module gitee.com/wardonet/weapp
+module github.com/wardonne/weapp
 
 go 1.18
 
