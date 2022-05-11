@@ -3,11 +3,22 @@ package weapp
 import (
 	"os"
 	"path/filepath"
+	"sync"
+
+	"github.com/gin-gonic/gin"
+	"github.com/wardonne/codec"
+	"github.com/wardonne/inject"
+	"gorm.io/gorm"
 )
 
 type Application struct {
-	container    *container
-	configration *configration
+	*gin.Engine
+	activeRouterPrefix []string
+
+	databases *sync.Map
+
+	container    *inject.Container
+	configration *Configration
 
 	BasePath    string
 	WorkingPath string
@@ -19,6 +30,8 @@ func NewApplication() *Application {
 	app.setWorkingPath()
 	app.withContainer()
 	app.withConfigration()
+	app.withEngine()
+	app.databases = new(sync.Map)
 	return app
 }
 
@@ -39,30 +52,26 @@ func (app *Application) setWorkingPath() {
 }
 
 func (app *Application) withContainer() {
-	app.container = newContainer()
+	app.container = inject.NewContainer()
 }
 
-func (app *Application) Container() *container {
+func (app *Application) Container() *inject.Container {
 	return app.container
 }
 
-func (app *Application) Provide(key string, instance any, callback func(instance any)) error {
-	return app.container.Store(key, instance, callback)
+func (app *Application) Provide(key string, instance any) error {
+	return app.container.Provide(key, instance)
 }
 
 func (app *Application) Load(key string) (any, bool) {
 	return app.container.Load(key)
 }
 
-func (app *Application) Destory(key string) {
-	app.container.Delete(key)
-}
-
 func (app *Application) withConfigration() {
-	app.configration = newConfigration(filepath.Join(app.WorkingPath, "config"))
+	app.container.Provide("config", new(Configration), filepath.Join(app.BasePath, "config"))
 }
 
-func (app *Application) Configration() *configration {
+func (app *Application) Configration() *Configration {
 	return app.configration
 }
 
@@ -70,10 +79,29 @@ func (app *Application) SetConfigPath(configPath string) {
 	app.configration.configPath = configPath
 }
 
-func (app *Application) SetConfigType(configType string) {
+func (app *Application) SetConfigType(configType codec.CodecType) {
 	app.configration.configType = configType
 }
 
-func (app *Application) Configure(filename string) error {
-	return app.configration.AddConfigration(filename)
+func (app *Application) Configure(modulename, filename string) error {
+	return app.configration.AddConfigration(modulename, filename)
+}
+
+func (app *Application) GetConfig(key string) any {
+	return app.configration.Get(key)
+}
+
+func (app *Application) withEngine() {
+	app.Engine = gin.New()
+}
+
+func (app *Application) RegisterDatabase(name string, db *gorm.DB, isDefault ...bool) {
+	if len(isDefault) > 0 && isDefault[0] {
+		app.databases.Store("default", db)
+	}
+	app.databases.Store(name, db)
+}
+
+func (app *Application) Run() error {
+	return app.Engine.Run()
 }
