@@ -13,7 +13,6 @@ import (
 
 type Application struct {
 	*gin.Engine
-	activeRouterPrefix []string
 
 	databases *sync.Map
 
@@ -32,22 +31,25 @@ func NewApplication() *Application {
 	app.withConfigration()
 	app.withEngine()
 	app.databases = new(sync.Map)
+	if err := app.container.Provide("app", app); err != nil {
+		panic(err)
+	}
 	return app
 }
 
 func (app *Application) setBasePath() {
-	var err error
-	if app.BasePath, err = os.Getwd(); err != nil {
+	if basePath, err := os.Getwd(); err != nil {
 		panic(err)
+	} else {
+		app.BasePath = basePath
 	}
 }
 
 func (app *Application) setWorkingPath() {
-	var err error
-	if app.WorkingPath, err = os.Executable(); err != nil {
+	if workingPath, err := os.Executable(); err != nil {
 		panic(err)
 	} else {
-		app.WorkingPath = filepath.Dir(app.WorkingPath)
+		app.WorkingPath = filepath.Dir(workingPath)
 	}
 }
 
@@ -67,8 +69,13 @@ func (app *Application) Load(key string) (any, bool) {
 	return app.container.Load(key)
 }
 
+func (app *Application) Make(key string, instance any) {
+
+}
+
 func (app *Application) withConfigration() {
-	app.container.Provide("config", new(Configration), filepath.Join(app.BasePath, "config"))
+	app.configration = new(Configration)
+	app.container.Provide("config", app.configration, filepath.Join(app.BasePath, "config"))
 }
 
 func (app *Application) Configration() *Configration {
@@ -87,7 +94,7 @@ func (app *Application) Configure(modulename, filename string) error {
 	return app.configration.AddConfigration(modulename, filename)
 }
 
-func (app *Application) GetConfig(key string) any {
+func (app *Application) Config(key string) any {
 	return app.configration.Get(key)
 }
 
@@ -102,6 +109,17 @@ func (app *Application) RegisterDatabase(name string, db *gorm.DB, isDefault ...
 	app.databases.Store(name, db)
 }
 
-func (app *Application) Run() error {
-	return app.Engine.Run()
+func (app *Application) Release(release ...bool) *Application {
+	releaseMode := true
+	if len(release) > 0 {
+		releaseMode = release[0]
+	}
+	if releaseMode {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	return app
+}
+
+func (app *Application) Run(addr ...string) error {
+	return app.Engine.Run(addr...)
 }

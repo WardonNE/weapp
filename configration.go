@@ -29,7 +29,7 @@ func (configration *Configration) SetCodecType(typ codec.CodecType) {
 }
 
 func (configration *Configration) AddConfigration(modulename, filename string) error {
-	codec := codec.NewCodecFactory().Get(codec.CodecType(configration.configType))
+	codec := codec.NewCodecFactory().Get(configration.configType)
 	f, err := os.Open(filepath.Join(configration.configPath, filename))
 	if err != nil {
 		return err
