@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/cobra"
 	"github.com/wardonne/codec"
 	"github.com/wardonne/inject"
 	"gorm.io/gorm"
@@ -18,6 +19,8 @@ type Application struct {
 
 	container    *inject.Container
 	configration *Configration
+
+	rootCmd *cobra.Command
 
 	BasePath    string
 	WorkingPath string
@@ -69,10 +72,6 @@ func (app *Application) Load(key string) (any, bool) {
 	return app.container.Load(key)
 }
 
-func (app *Application) Make(key string, instance any) {
-
-}
-
 func (app *Application) withConfigration() {
 	app.configration = new(Configration)
 	app.container.Provide("config", app.configration, filepath.Join(app.BasePath, "config"))
@@ -98,6 +97,10 @@ func (app *Application) Config(key string) any {
 	return app.configration.Get(key)
 }
 
+func (app *Application) AddCommand(cmd ...*cobra.Command) {
+	app.rootCmd.AddCommand(cmd...)
+}
+
 func (app *Application) withEngine() {
 	app.Engine = gin.New()
 }
@@ -121,5 +124,15 @@ func (app *Application) Release(release ...bool) *Application {
 }
 
 func (app *Application) Run(addr ...string) error {
-	return app.Engine.Run(addr...)
+	app.rootCmd = &cobra.Command{
+		Use: "cli",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return cmd.Help()
+		},
+	}
+	app.rootCmd.AddCommand()
+	if len(os.Args) == 1 {
+		return app.Engine.Run(addr...)
+	}
+	return app.rootCmd.Execute()
 }

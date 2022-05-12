@@ -1,0 +1,3 @@
+package command
+
+func AddMakeServiceCommand()

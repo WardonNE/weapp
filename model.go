@@ -12,9 +12,12 @@ type IModel interface {
 
 type Model struct {
 	*gorm.DB
+
+	app *Application
 }
 
 func (m *Model) Init(app *Application) {
+	m.app = app
 	connectionName := m.Database()
 	db, ok := app.databases.Load(connectionName)
 	if ok {
