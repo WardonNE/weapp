@@ -1,6 +1,7 @@
 package weapp
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,28 +13,38 @@ import (
 	"gorm.io/gorm"
 )
 
+var release = false
+
+func Release() {
+	release = true
+}
+
+func isCommandLineMode() bool {
+	return len(os.Args) > 1
+}
+
 type Application struct {
 	*gin.Engine
-
-	databases *sync.Map
-
+	httpAddress  string
+	databases    *sync.Map
 	container    *inject.Container
 	configration *Configration
-
-	rootCmd *cobra.Command
-
-	BasePath    string
-	WorkingPath string
+	rootCmd      *cobra.Command
+	BasePath     string
+	WorkingPath  string
+	executable   string
 }
 
 func NewApplication() *Application {
 	app := &Application{}
 	app.setBasePath()
 	app.setWorkingPath()
+	app.setRootCommand()
 	app.withContainer()
 	app.withConfigration()
 	app.withEngine()
 	app.databases = new(sync.Map)
+	// store app instance into container
 	if err := app.container.Provide("app", app); err != nil {
 		panic(err)
 	}
@@ -97,11 +108,10 @@ func (app *Application) Config(key string) any {
 	return app.configration.Get(key)
 }
 
-func (app *Application) AddCommand(cmd ...*cobra.Command) {
-	app.rootCmd.AddCommand(cmd...)
-}
-
 func (app *Application) withEngine() {
+	if release || isCommandLineMode() {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	app.Engine = gin.New()
 }
 
@@ -112,27 +122,33 @@ func (app *Application) RegisterDatabase(name string, db *gorm.DB, isDefault ...
 	app.databases.Store(name, db)
 }
 
-func (app *Application) Release(release ...bool) *Application {
-	releaseMode := true
-	if len(release) > 0 {
-		releaseMode = release[0]
+func (app *Application) setRootCommand() {
+	app.rootCmd = &cobra.Command{
+		Run: func(cmd *cobra.Command, args []string) {
+			gin.SetMode(gin.DebugMode)
+			address := app.httpAddress
+			host, err := cmd.Flags().GetString("host")
+			if err != nil {
+				panic(err)
+			}
+			port, err := cmd.Flags().GetString("port")
+			if err != nil {
+				panic(err)
+			}
+			if host != "" && port != "" {
+				address = fmt.Sprintf("%s:%s", host, port)
+			}
+			app.Engine.Run(address)
+		},
 	}
-	if releaseMode {
-		gin.SetMode(gin.ReleaseMode)
-	}
-	return app
+	app.rootCmd.PersistentFlags().StringP("host", "H", "127.0.0.1", "http server host")
+	app.rootCmd.PersistentFlags().StringP("port", "P", "8088", "http server port")
+}
+
+func (app *Application) AddCommand(commands ...*cobra.Command) {
+	app.rootCmd.AddCommand(commands...)
 }
 
 func (app *Application) Run(addr ...string) error {
-	app.rootCmd = &cobra.Command{
-		Use: "cli",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return cmd.Help()
-		},
-	}
-	app.rootCmd.AddCommand()
-	if len(os.Args) == 1 {
-		return app.Engine.Run(addr...)
-	}
 	return app.rootCmd.Execute()
 }
