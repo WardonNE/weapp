@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/wardonne/codec"
 	"github.com/wardonne/inject"
+	"github.com/wardonne/weapp/utils"
 	"gorm.io/gorm"
 )
 
@@ -52,7 +53,7 @@ func NewApplication() *Application {
 }
 
 func (app *Application) setBasePath() {
-	if basePath, err := os.Getwd(); err != nil {
+	if basePath, err := utils.BasePath(); err != nil {
 		panic(err)
 	} else {
 		app.BasePath = basePath
@@ -60,10 +61,10 @@ func (app *Application) setBasePath() {
 }
 
 func (app *Application) setWorkingPath() {
-	if workingPath, err := os.Executable(); err != nil {
+	if workingPath, err := utils.WorkingPath(); err != nil {
 		panic(err)
 	} else {
-		app.WorkingPath = filepath.Dir(workingPath)
+		app.WorkingPath = workingPath
 	}
 }
 
