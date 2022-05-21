@@ -147,8 +147,8 @@ func (app *Application) setRootCommand() {
 			app.Engine.Run(address)
 		},
 	}
-	app.rootCmd.PersistentFlags().StringP("host", "H", "127.0.0.1", "http server host")
-	app.rootCmd.PersistentFlags().StringP("port", "P", "8088", "http server port")
+	app.rootCmd.PersistentFlags().StringP("host", "H", "", "http server host")
+	app.rootCmd.PersistentFlags().StringP("port", "P", "", "http server port")
 }
 
 func (app *Application) AddCommand(commands ...*cobra.Command) {
