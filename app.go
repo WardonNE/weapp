@@ -156,5 +156,8 @@ func (app *Application) AddCommand(commands ...*cobra.Command) {
 }
 
 func (app *Application) Run(addr ...string) error {
+	if len(addr) > 0 {
+		app.httpAddress = addr[0]
+	}
 	return app.rootCmd.Execute()
 }
