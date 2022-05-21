@@ -16,8 +16,12 @@ import (
 
 var release = false
 
-func Release() {
-	release = true
+func Release(enabled ...bool) {
+	if len(enabled) > 0 {
+		release = enabled[0]
+	} else {
+		release = true
+	}
 }
 
 func isCommandLineMode() bool {
