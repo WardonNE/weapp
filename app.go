@@ -116,10 +116,15 @@ func (app *Application) withEngine() {
 	app.Engine = gin.New()
 }
 
-func (app *Application) RegisterDatabase(name string, db *gorm.DB, isDefault ...bool) {
-	if len(isDefault) > 0 && isDefault[0] {
-		app.databases.Store("default", db)
+func (app *Application) ConnectDatabase(name string, driver string, dsn string) {
+	db, err := connect(driver, dsn)
+	if err != nil {
+		panic(err)
 	}
+	app.RegisterDatabase(name, db)
+}
+
+func (app *Application) RegisterDatabase(name string, db *gorm.DB) {
 	app.databases.Store(name, db)
 }
 
