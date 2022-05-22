@@ -11,7 +11,6 @@ import (
 	"github.com/wardonne/codec"
 	"github.com/wardonne/inject"
 	"github.com/wardonne/weapp/utils"
-	"gorm.io/gorm"
 )
 
 var release = false
@@ -117,14 +116,14 @@ func (app *Application) withEngine() {
 }
 
 func (app *Application) ConnectDatabase(name string, driver string, dsn string) {
-	db, err := connect(driver, dsn)
+	db, err := OpenDB(driver, dsn)
 	if err != nil {
 		panic(err)
 	}
 	app.RegisterDatabase(name, db)
 }
 
-func (app *Application) RegisterDatabase(name string, db *gorm.DB) {
+func (app *Application) RegisterDatabase(name string, db *Database) {
 	app.databases.Store(name, db)
 }
 
