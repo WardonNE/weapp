@@ -27,12 +27,12 @@ type Application struct {
 	*gin.Engine
 	httpAddress  string
 	databases    *sync.Map
+	migrations   *Migrations
 	container    *inject.Container
 	configration *Configration
 	rootCmd      *cobra.Command
 	BasePath     string
 	WorkingPath  string
-	executable   string
 }
 
 func NewApplication() *Application {
@@ -44,6 +44,7 @@ func NewApplication() *Application {
 	app.withConfigration()
 	app.withEngine()
 	app.databases = new(sync.Map)
+	app.migrations = new(Migrations)
 	// store app instance into container
 	if err := app.container.Provide("app", app); err != nil {
 		panic(err)
@@ -125,6 +126,17 @@ func (app *Application) ConnectDatabase(name string, driver string, dsn string) 
 
 func (app *Application) RegisterDatabase(name string, db *Database) {
 	app.databases.Store(name, db)
+}
+
+func (app *Application) DB(name string) *Database {
+	if object, ok := app.databases.Load(name); ok {
+		return object.(*Database)
+	}
+	panic(fmt.Errorf("unregistered database: `%s`", name))
+}
+
+func (app *Application) Migration(migrations ...IMigration) {
+	app.migrations.Migration(migrations...)
 }
 
 func (app *Application) setRootCommand() {

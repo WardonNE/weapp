@@ -10,16 +10,14 @@ import (
 
 type Database struct {
 	*gorm.DB
-	driver     string
-	dsn        string
-	migrations []IMigration
+	driver string
+	dsn    string
 }
 
 func OpenDB(driver, dsn string) (*Database, error) {
 	db := &Database{
-		driver:     driver,
-		dsn:        dsn,
-		migrations: make([]IMigration, 0),
+		driver: driver,
+		dsn:    dsn,
 	}
 	if err := db.Connect(); err != nil {
 		return nil, err
