@@ -111,3 +111,11 @@ type Migration struct {
 func (m *Migration) SetApplication(app *Application) {
 	m.app = app
 }
+
+func (m *Migration) GetApplication() *Application {
+	return m.app
+}
+
+func (m *Migration) Database() *Database {
+	return m.app.DB("default")
+}
