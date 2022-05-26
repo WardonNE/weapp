@@ -19,10 +19,13 @@ func (m *Migrations) Migration(migrations ...IMigration) {
 func (m *Migrations) Commit() {
 	for _, migration := range m.migrations {
 		db := migration.Database()
-		migrator := db.Migrator()
+		migrator := db.Set("gorm:table_options", "ENGINE=InnoDB").Migrator()
 		db.Begin()
 		if !migrator.HasTable(new(MigrationRecord)) {
-			migrator.CreateTable(new(MigrationRecord))
+			if err := migrator.CreateTable(new(MigrationRecord)); err != nil {
+				db.Rollback()
+				panic(err)
+			}
 		}
 		var count int64 = 0
 		if err := db.Where(&MigrationRecord{
