@@ -96,9 +96,18 @@ func (MigrationRecord) TableName() string {
 }
 
 type IMigration interface {
+	SetApplication(app *Application)
 	Commit() error
 	Rollback() error
 	Name() string
 	Version() string
 	Database() *Database
+}
+
+type Migration struct {
+	app *Application
+}
+
+func (m *Migration) SetApplication(app *Application) {
+	m.app = app
 }
