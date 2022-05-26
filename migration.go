@@ -102,18 +102,3 @@ type IMigration interface {
 	Version() string
 	Database() *Database
 }
-
-type Migration struct {
-}
-
-func (m *Migration) Database() *Database {
-	return nil
-}
-
-func (m *Migration) Up() error {
-	return nil
-}
-
-func (m *Migration) Down() error {
-	return nil
-}
