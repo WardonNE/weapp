@@ -97,6 +97,7 @@ func (MigrationRecord) TableName() string {
 
 type IMigration interface {
 	SetApplication(app *Application)
+	GetApplication() *Application
 	Commit() error
 	Rollback() error
 	Name() string

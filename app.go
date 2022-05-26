@@ -147,7 +147,12 @@ func (app *Application) withMigrations() {
 }
 
 func (app *Application) Migration(migrations ...IMigration) {
-	app.migrations.Migration(migrations...)
+	for _, migration := range migrations {
+		if migration.GetApplication() == nil {
+			migration.SetApplication(app)
+		}
+		app.migrations.Migration(migration)
+	}
 }
 
 func (app *Application) setRootCommand() {
