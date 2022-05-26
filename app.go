@@ -43,8 +43,9 @@ func NewApplication() *Application {
 	app.withContainer()
 	app.withConfigration()
 	app.withEngine()
-	app.databases = new(sync.Map)
-	app.migrations = new(Migrations)
+	app.withDatabases()
+	app.withMigrations()
+	app.withDefaultCommands()
 	// store app instance into container
 	if err := app.container.Provide("app", app); err != nil {
 		panic(err)
@@ -116,6 +117,10 @@ func (app *Application) withEngine() {
 	app.Engine = gin.New()
 }
 
+func (app *Application) withDatabases() {
+	app.databases = new(sync.Map)
+}
+
 func (app *Application) ConnectDatabase(name string, driver string, dsn string) {
 	db, err := OpenDB(driver, dsn)
 	if err != nil {
@@ -133,6 +138,12 @@ func (app *Application) DB(name string) *Database {
 		return object.(*Database)
 	}
 	panic(fmt.Errorf("unregistered database: `%s`", name))
+}
+
+func (app *Application) withMigrations() {
+	app.migrations = &Migrations{
+		migrations: make([]IMigration, 0),
+	}
 }
 
 func (app *Application) Migration(migrations ...IMigration) {
@@ -164,6 +175,10 @@ func (app *Application) setRootCommand() {
 
 func (app *Application) AddCommand(commands ...*cobra.Command) {
 	app.rootCmd.AddCommand(commands...)
+}
+
+func (app *Application) withDefaultCommands() {
+	app.AddCommand(migrateCmd(app))
 }
 
 func (app *Application) Run(addr ...string) error {

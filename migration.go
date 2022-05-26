@@ -16,7 +16,7 @@ func (m *Migrations) Migration(migrations ...IMigration) {
 	m.migrations = append(m.migrations, migrations...)
 }
 
-func (m *Migrations) Submit() {
+func (m *Migrations) Commit() {
 	for _, migration := range m.migrations {
 		db := migration.Database()
 		migrator := db.Migrator()
@@ -35,7 +35,7 @@ func (m *Migrations) Submit() {
 		if count > 0 {
 			continue
 		}
-		if err := migration.Submit(); err != nil {
+		if err := migration.Commit(); err != nil {
 			db.Rollback()
 			panic(err)
 		}
@@ -93,7 +93,7 @@ func (MigrationRecord) TableName() string {
 }
 
 type IMigration interface {
-	Submit() error
+	Commit() error
 	Rollback() error
 	Name() string
 	Version() string
