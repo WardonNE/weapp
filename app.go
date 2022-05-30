@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/cobra"
@@ -24,9 +23,8 @@ func isCommandLineMode() bool {
 }
 
 type Application struct {
-	*gin.Engine
+	engine       *gin.Engine
 	httpAddress  string
-	databases    *sync.Map
 	migrations   *Migrations
 	container    *inject.Container
 	configration *Configration
@@ -37,20 +35,23 @@ type Application struct {
 
 func NewApplication() *Application {
 	app := &Application{}
+	app.withContainer()
 	app.setBasePath()
 	app.setWorkingPath()
 	app.setRootCommand()
-	app.withContainer()
 	app.withConfigration()
 	app.withEngine()
-	app.withDatabases()
 	app.withMigrations()
-	app.withDefaultCommands()
 	// store app instance into container
-	if err := app.container.Provide("app", app); err != nil {
+	if instance, err := app.container.LoadOrStore("app", app); err != nil {
 		panic(err)
+	} else {
+		return instance.(*Application)
 	}
-	return app
+}
+
+func (app *Application) Init() {
+
 }
 
 func (app *Application) setBasePath() {
@@ -81,8 +82,21 @@ func (app *Application) Provide(key string, instance any) error {
 	return app.container.Provide(key, instance)
 }
 
+func (app *Application) MustProvide(key string, instance any) {
+	if err := app.container.Provide(key, instance); err != nil {
+		panic(err)
+	}
+}
+
 func (app *Application) Load(key string) (any, bool) {
 	return app.container.Load(key)
+}
+
+func (app *Application) MustLoad(key string) any {
+	if instance, ok := app.Load(key); ok {
+		return instance
+	}
+	panic(fmt.Errorf("invalid provider: %s", key))
 }
 
 func (app *Application) withConfigration() {
@@ -114,11 +128,11 @@ func (app *Application) withEngine() {
 	if release || isCommandLineMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
-	app.Engine = gin.New()
+	app.engine = gin.New()
 }
 
-func (app *Application) withDatabases() {
-	app.databases = new(sync.Map)
+func (app *Application) Router() *gin.Engine {
+	return app.engine
 }
 
 func (app *Application) ConnectDatabase(name string, driver string, dsn string) {
@@ -130,14 +144,15 @@ func (app *Application) ConnectDatabase(name string, driver string, dsn string) 
 }
 
 func (app *Application) RegisterDatabase(name string, db *Database) {
-	app.databases.Store(name, db)
+	app.MustProvide(fmt.Sprintf("db:%s", name), db)
 }
 
-func (app *Application) DB(name string) *Database {
-	if object, ok := app.databases.Load(name); ok {
-		return object.(*Database)
+func (app *Application) DB(name ...string) *Database {
+	db := "default"
+	if len(name) > 0 {
+		db = name[0]
 	}
-	panic(fmt.Errorf("unregistered database: `%s`", name))
+	return app.MustLoad(fmt.Sprintf("db:%s", db)).(*Database)
 }
 
 func (app *Application) withMigrations() {
@@ -148,10 +163,11 @@ func (app *Application) withMigrations() {
 
 func (app *Application) Migration(migrations ...IMigration) {
 	for _, migration := range migrations {
-		if migration.GetApplication() == nil {
-			migration.SetApplication(app)
+		if instance, err := app.container.LoadOrStore(fmt.Sprintf("migration:%s_%s", migration.Version(), migration.Name()), migration); err != nil {
+			panic(err)
+		} else {
+			app.migrations.Migration(instance.(IMigration))
 		}
-		app.migrations.Migration(migration)
 	}
 }
 
@@ -171,22 +187,37 @@ func (app *Application) setRootCommand() {
 			if host != "" && port != "" {
 				address = fmt.Sprintf("%s:%s", host, port)
 			}
-			app.Engine.Run(address)
+			app.engine.Run(address)
 		},
 	}
 	app.rootCmd.PersistentFlags().StringP("host", "H", "", "http server host")
 	app.rootCmd.PersistentFlags().StringP("port", "P", "", "http server port")
 }
 
-func (app *Application) AddCommand(commands ...*cobra.Command) {
-	app.rootCmd.AddCommand(commands...)
+func (app *Application) AddCommand(commands ...ICommand) {
+	for _, command := range commands {
+		if instance, err := app.container.LoadOrStore(fmt.Sprintf("command:%s", command.Signation()), command); err != nil {
+			panic(err)
+		} else {
+			app.rootCmd.AddCommand(instance.(ICommand).Command())
+		}
+	}
 }
 
 func (app *Application) withDefaultCommands() {
-	app.AddCommand(migrateCmd(app))
+	defaultCommands := defaultCommands()
+	for _, command := range defaultCommands {
+		if instance, err := app.container.LoadOrStore(fmt.Sprintf("command:%s", command.Signation()), command); err != nil {
+			panic(err)
+		} else {
+			app.rootCmd.AddCommand(instance.(ICommand).Command())
+		}
+	}
 }
 
 func (app *Application) Run(addr ...string) error {
+	app.withDefaultCommands()
+
 	if len(addr) > 0 {
 		app.httpAddress = addr[0]
 	}

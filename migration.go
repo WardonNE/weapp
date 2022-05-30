@@ -1,7 +1,10 @@
 package weapp
 
 import (
+	"fmt"
 	"time"
+
+	"github.com/gookit/color"
 )
 
 type Migrations struct {
@@ -16,10 +19,25 @@ func (m *Migrations) Migration(migrations ...IMigration) {
 	m.migrations = append(m.migrations, migrations...)
 }
 
-func (m *Migrations) Commit() {
+func (m *Migrations) Commit(names ...string) {
 	for _, migration := range m.migrations {
+		if len(names) > 0 {
+			exists := false
+			for _, name := range names {
+				if name == migration.Name() {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				continue
+			}
+		}
 		db := migration.Database()
-		migrator := db.Set("gorm:table_options", "ENGINE=InnoDB").Migrator()
+		if db.driver == "mysql" {
+			db.Set("gorm:table_options", "ENGINE=InnoDB")
+		}
+		migrator := db.Migrator()
 		db.Begin()
 		if !migrator.HasTable(new(MigrationRecord)) {
 			if err := migrator.CreateTable(new(MigrationRecord)); err != nil {
@@ -28,7 +46,7 @@ func (m *Migrations) Commit() {
 			}
 		}
 		var count int64 = 0
-		if err := db.Where(&MigrationRecord{
+		if err := db.Model(&MigrationRecord{}).Where(&MigrationRecord{
 			Migration: migration.Name(),
 			Version:   migration.Version(),
 		}).Count(&count).Error; err != nil {
@@ -38,6 +56,8 @@ func (m *Migrations) Commit() {
 		if count > 0 {
 			continue
 		}
+		startTime := time.Now()
+		fmt.Printf("%s: %s\r\n", color.Warn.Render("migrating"), migration.Name())
 		if err := migration.Commit(); err != nil {
 			db.Rollback()
 			panic(err)
@@ -49,19 +69,35 @@ func (m *Migrations) Commit() {
 			UpdatedAt: time.Now(),
 		})
 		db.Commit()
+		fmt.Printf("%s: %s(%2fs)\r\n", color.Success.Render("migrated"), migration.Name(), time.Now().Sub(startTime).Seconds())
 	}
 }
 
-func (m *Migrations) Rollback() {
+func (m *Migrations) Rollback(names ...string) {
 	for _, migration := range m.migrations {
+		if len(names) > 0 {
+			exists := false
+			for _, name := range names {
+				if name == migration.Name() {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				continue
+			}
+		}
 		db := migration.Database()
+		if db.driver == "mysql" {
+			db.Set("gorm:table_options", "ENGINE=InnoDB")
+		}
 		migrator := db.Migrator()
 		db.Begin()
 		if !migrator.HasTable(new(MigrationRecord)) {
 			migrator.CreateTable(new(MigrationRecord))
 		}
 		var count int64 = 0
-		if err := db.Where(&MigrationRecord{
+		if err := db.Model(&MigrationRecord{}).Where(&MigrationRecord{
 			Migration: migration.Name(),
 			Version:   migration.Version(),
 		}).Count(&count).Error; err != nil {
@@ -71,6 +107,8 @@ func (m *Migrations) Rollback() {
 		if count == 0 {
 			continue
 		}
+		startTime := time.Now()
+		fmt.Printf("%s: %s\r\n", color.Warn.Render("migrating"), migration.Name())
 		if err := migration.Rollback(); err != nil {
 			db.Rollback()
 			panic(err)
@@ -80,6 +118,7 @@ func (m *Migrations) Rollback() {
 			panic(err)
 		}
 		db.Commit()
+		fmt.Printf("%s: %s(%2fs)\r\n", color.Success.Render("migrated"), migration.Name(), time.Now().Sub(startTime).Seconds())
 	}
 }
 
@@ -96,8 +135,6 @@ func (MigrationRecord) TableName() string {
 }
 
 type IMigration interface {
-	SetApplication(app *Application)
-	GetApplication() *Application
 	Commit() error
 	Rollback() error
 	Name() string
@@ -106,17 +143,9 @@ type IMigration interface {
 }
 
 type Migration struct {
-	app *Application
-}
-
-func (m *Migration) SetApplication(app *Application) {
-	m.app = app
-}
-
-func (m *Migration) GetApplication() *Application {
-	return m.app
+	*Component `inject:"component"`
 }
 
 func (m *Migration) Database() *Database {
-	return m.app.DB("default")
+	return m.DB("default")
 }
