@@ -10,6 +10,7 @@ import (
 	"github.com/wardonne/codec"
 	"github.com/wardonne/inject"
 	"github.com/wardonne/weapp/utils"
+	"gorm.io/gorm"
 )
 
 var release = false
@@ -68,6 +69,10 @@ func (app *Application) setWorkingPath() {
 	} else {
 		app.WorkingPath = workingPath
 	}
+}
+
+func (app *Application) HTTPHost() string {
+	return app.httpAddress
 }
 
 func (app *Application) withContainer() {
@@ -135,8 +140,8 @@ func (app *Application) Router() *gin.Engine {
 	return app.engine
 }
 
-func (app *Application) ConnectDatabase(name string, driver string, dsn string) {
-	db, err := OpenDB(driver, dsn)
+func (app *Application) ConnectDatabase(name string, driver string, dsn string, config ...gorm.Option) {
+	db, err := OpenDB(driver, dsn, config...)
 	if err != nil {
 		panic(err)
 	}
