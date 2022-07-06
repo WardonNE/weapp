@@ -49,7 +49,7 @@ import (
 )
 
 type {{.structName}} struct {
-	weapp.Migration
+	*weapp.Migration ` + "`inject:\"migration\"`" + `
 }
 
 func (m *{{.structName}}) Version() string {

@@ -6,13 +6,13 @@ import (
 )
 
 func WorkingPath() (string, error) {
+	return os.Getwd()
+}
+
+func BasePath() (string, error) {
 	executablePath, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Dir(executablePath), nil
-}
-
-func BasePath() (string, error) {
-	return os.Getwd()
 }
